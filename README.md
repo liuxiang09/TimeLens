@@ -11,6 +11,7 @@
 </p>
 
 ## 📰 News
+- **2026.02.26**: 🚀 Training for **TimeLens-7B** based on **Qwen2.5-VL-7B** is available on the [**train**](https://github.com/TencentARC/TimeLens/tree/train) branch.
 - **2026.02.26**: 🚀 We now support training **TimeLens-8B** based on **Qwen3-8B-VL**.
 - **2026.02.22**: 🎉 TimeLens has been accepted to **CVPR 2026**.
 
@@ -396,6 +397,10 @@ Use the existing TimeLens-Bench evaluation code directly:
 model_path="output/TimeLens-8B/grpo/<your_grpo_run_dir>" \
 bash scripts/eval_timelens_bench.sh
 ```
+
+#### TimeLens-7B training (based on Qwen2.5-VL)
+
+Please use the [**train**](https://github.com/TencentARC/TimeLens/tree/train) branch for **TimeLens-7B (Qwen2.5-VL)** training. The full training scripts and usage instructions are maintained there.
 
 ## 📝 Citation
 If you find our paper, code, model, and data helpful for your research and applications, please consider giving a star ⭐ and citation 📝 :)
