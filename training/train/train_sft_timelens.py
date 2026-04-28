@@ -1,7 +1,3 @@
-"""
-SFT training script for TimeLens-8B.
-Adapted from Qwen2-VL-Finetune/VideoMind train_sft_videomind.py.
-"""
 import ast
 import os
 import pathlib
@@ -268,6 +264,12 @@ def train():
                 non_lora_state_dict,
                 os.path.join(output_dir_lora, "non_lora_state_dict.bin"),
             )
+            rank0_print("Merging LoRA weights into base model ...")
+            merged_model = model.merge_and_unload()
+            output_dir_merged = os.path.join(training_args.output_dir, "merged")
+            merged_model.save_pretrained(output_dir_merged, safe_serialization=True)
+            processor.save_pretrained(output_dir_merged)
+            rank0_print(f"Merged model saved to {output_dir_merged}")
     else:
         safe_save_model_for_hf_trainer(trainer, output_dir=training_args.output_dir)
 

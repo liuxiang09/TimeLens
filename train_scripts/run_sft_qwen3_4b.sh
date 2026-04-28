@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bash train_scripts/run_sft_qwen3_8b.sh
+# bash train_scripts/run_sft_qwen3_4b.sh
 
 set -euo pipefail
 
@@ -9,12 +9,12 @@ export PYTHONPATH="./:${PYTHONPATH:-}"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-"1,2,3"}
 
-model_path="/home/zhangx/Qwen/Qwen3-VL-8B-Instruct"
+model_path="/home/zhangx/Qwen/Qwen3-VL-4B-Instruct"
 datasets="gemini_refined_data"
-model_id="qwen3-vl-8b"
+model_id="qwen3-vl-4b"
 min_tokens=64
 total_tokens=14336
-#total_tokens=12288
+#total_tokens=11264
 fps=2
 fps_max_frames=""
 seed=42
@@ -57,7 +57,7 @@ if [[ -z "${fps_max_frames}" ]]; then
   fps_max_frames=$((total_tokens / min_tokens * 2))
 fi
 run_tag="$(date +%Y%m%d-%H%M)"
-run_name="sft-${run_tag}_MAXFRAMES-${fps_max_frames}_FPS-${fps}_TOTALtokens-${total_tokens}_MINtokens-${min_tokens}"
+run_name="sft-${run_tag}_MAXFRAMES-${fps_max_frames}_FPS-${fps}_TOTALtokens-${total_tokens}"
 output_dir="${output_root}/${run_name}"
 
 mkdir -p "${output_dir}"
@@ -86,9 +86,9 @@ deepspeed training/train/train_sft_timelens.py \
   --max_video_len 500 \
   --max_num_words 200 \
   --freeze_vision_tower True \
-  --freeze_llm True \
+  --freeze_llm False \
   --freeze_merger False \
-  --lora_enable True \
+  --lora_enable False \
   --learning_rate 1e-5 \
   --merger_lr 1e-5 \
   --weight_decay 0.1 \
