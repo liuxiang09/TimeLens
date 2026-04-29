@@ -12,3 +12,6 @@ __pycache__
 /output
 /tensorboard
 /wandb
+
+.codex
+.claude
