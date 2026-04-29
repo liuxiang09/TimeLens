@@ -11,8 +11,8 @@ def parse_query(query):
 
 
 class ActivitynetTimeLensDataset:
-    ANNO_PATH_TEST = "data/TimeLens-Bench/activitynet-timelens.json"
-    VIDEO_ROOT = "data/TimeLens-Bench/videos/activitynet"
+    ANNO_PATH_TEST = "/home/zhangx/data/TimeLens-Bench/activitynet-timelens.json"
+    VIDEO_ROOT = "/home/zhangx/data/TimeLens-Bench/videos/activitynet"
     DATASET_SOURCE = "ActivityNet-TimeLens"
 
     @classmethod
@@ -43,20 +43,20 @@ class ActivitynetTimeLensDataset:
 
 
 class QVHighlightsTimeLensDataset(ActivitynetTimeLensDataset):
-    ANNO_PATH_TEST = "data/TimeLens-Bench/qvhighlights-timelens.json"
-    VIDEO_ROOT = "data/TimeLens-Bench/videos/qvhighlights"
+    ANNO_PATH_TEST = "/home/zhangx/data/TimeLens-Bench/qvhighlights-timelens.json"
+    VIDEO_ROOT = "/home/zhangx/data/TimeLens-Bench/videos/qvhighlights"
     DATASET_SOURCE = "QVHighlights-TimeLens"
 
 
 class CharadesTimeLensDataset(ActivitynetTimeLensDataset):
-    ANNO_PATH_TEST = "data/TimeLens-Bench/charades-timelens.json"
-    VIDEO_ROOT = "data/TimeLens-Bench/videos/charades"
+    ANNO_PATH_TEST = "/home/zhangx/data/TimeLens-Bench/charades-timelens.json"
+    VIDEO_ROOT = "/home/zhangx/data/TimeLens-Bench/videos/charades"
     DATASET_SOURCE = "Charades-TimeLens"
 
 
 class TimeLens100KDataset:
-    ANNO_PATH_TRAIN = "data/TimeLens-100K/timelens-100k.jsonl"
-    VIDEO_ROOT = "data/TimeLens-100K/videos"
+    ANNO_PATH_TRAIN = "/home/zhangx/data/TimeLens-100K/timelens-100k.jsonl"
+    VIDEO_ROOT = "/home/zhangx/data/TimeLens-100K/videos"
 
     @classmethod
     def load_annos(self, split="train"):

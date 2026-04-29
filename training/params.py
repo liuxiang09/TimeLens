@@ -47,7 +47,7 @@ class TrainingArguments(HFTrainingArguments):
     vision_lora: bool = False
     use_dora: bool = False
     lora_rank: int = 64
-    lora_alpha: int = 16
+    lora_alpha: int = 128
     lora_dropout: float = 0.05
     lora_weight_path: str = ""
     lora_bias: str = "none"
@@ -90,7 +90,7 @@ class GRPOArguments(GRPOConfigTRL):
     vision_lora: bool = False
     use_dora: bool = False
     lora_rank: int = 64
-    lora_alpha: int = 16
+    lora_alpha: int = 128
     lora_dropout: float = 0.05
     lora_weight_path: str = ""
     lora_bias: str = "none"
