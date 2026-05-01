@@ -5,12 +5,14 @@ import copy
 from qwen_vl_utils import process_vision_info
 from torch.utils.data import Dataset
 
+from training.model_family import infer_model_family, uses_textual_timestamps, video_pixel_scale
+
 GROUNDER_PROMPT = (
     "Please find the visual event described by the sentence '{}', determining its starting and ending times. "
     "The format should be: 'The event happens in <start time> - <end time> seconds'."
 )
 
-# prompt for TimeLens-7B (based on Qwen2.5-VL) with interleaved textual timestamps
+# prompt for Qwen2.5-VL based models with interleaved textual timestamps
 GROUNDER_PROMPT_TEXT_TIMESTAMP = (
     "You are given a video with multiple frames. "
     "The numbers before each video frame indicate its sampling timestamp (in seconds). "
@@ -23,8 +25,15 @@ class GroundingDataset(Dataset):
         self.annos = annos
         self.processor = processor
         self.args = args
-        if "timelens-7b" in args.model_path.lower():
-            # prompt for TimeLens-7B (based on Qwen2.5-VL) with interleaved textual timestamps
+        self.model_refs = (
+            getattr(args, "format_model_path", None),
+            getattr(args, "processor_path", None),
+            args.model_path,
+        )
+        self.model_family = infer_model_family(*self.model_refs)
+        self.uses_textual_timestamps = uses_textual_timestamps(*self.model_refs)
+        if self.uses_textual_timestamps:
+            # prompt for Qwen2.5-VL based models with interleaved textual timestamps
             self.prompt = GROUNDER_PROMPT_TEXT_TIMESTAMP
         else:
             self.prompt = GROUNDER_PROMPT
@@ -38,16 +47,7 @@ class GroundingDataset(Dataset):
         video_path = anno["video_path"]
         query = anno["query"]
 
-        if "qwen3" in self.args.model_path.lower() or "timelens-8b" in self.args.model_path.lower():
-            # for TimeLens-8B(based on Qwen3-VL) and Qwen3-VL models
-            downsample_rate = 32
-        elif "qwen2" in self.args.model_path.lower() or "timelens-7b" in self.args.model_path.lower():
-            # for TimeLens-7B (based on Qwen2.5-VL) and Qwen2.5-VL models
-            downsample_rate = 28
-        else:
-            raise NotImplementedError(
-                f"Model {self.args.model_path} not supported yet."
-            )
+        pixel_scale = video_pixel_scale(*self.model_refs)
 
         messages = [
             {
@@ -56,8 +56,8 @@ class GroundingDataset(Dataset):
                     {
                         "type": "video",
                         "video": video_path,
-                        "min_pixels": self.args.min_tokens * downsample_rate * downsample_rate,
-                        "total_pixels": self.args.total_tokens * downsample_rate * downsample_rate,
+                        "min_pixels": self.args.min_tokens * pixel_scale,
+                        "total_pixels": self.args.total_tokens * pixel_scale,
                         "fps": self.args.fps,
                     },
                     {"type": "text", "text": self.prompt.format(query)},
@@ -69,8 +69,8 @@ class GroundingDataset(Dataset):
             messages, tokenize=False, add_generation_prompt=True
         )
 
-        if "timelens-7b" in self.args.model_path.lower():
-            # for TimeLens-7B (based on Qwen2.5-VL) with interleaved textual timestamps
+        if self.uses_textual_timestamps:
+            # for Qwen2.5-VL based models with interleaved textual timestamps
             images, videos = process_vision_info(messages, return_video_metadata=True)
             inputs = self.processor(
                 text=[text],
@@ -80,10 +80,9 @@ class GroundingDataset(Dataset):
                 return_tensors="pt",
             )
         elif (
-            "qwen3" in self.args.model_path.lower()
-            or "timelens-8b" in self.args.model_path.lower()
+            self.model_family == "qwen3-vl"
         ):
-            # for TimeLens-8B(based on Qwen3-VL) and Qwen3-VL models
+            # for Qwen3-VL based models
             images, videos, video_kwargs = process_vision_info(
                 messages,
                 image_patch_size=16,
@@ -97,19 +96,6 @@ class GroundingDataset(Dataset):
                 images=images,
                 videos=videos,
                 video_metadata=video_metadatas,
-                padding=True,
-                return_tensors="pt",
-                **video_kwargs,
-            )
-        elif "qwen2" in self.args.model_path.lower():
-            # for Qwen2.5-VL model
-            images, videos, video_kwargs = process_vision_info(
-                messages, return_video_kwargs=True
-            )
-            inputs = self.processor(
-                text=[text],
-                images=images,
-                videos=videos,
                 padding=True,
                 return_tensors="pt",
                 **video_kwargs,

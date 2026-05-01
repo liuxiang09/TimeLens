@@ -1,39 +1,33 @@
 #!/usr/bin/env bash
-# bash train_scripts/run_sft_qwen3_4b.sh
 
 set -euo pipefail
 
-export NCCL_P2P_DISABLE=1
-export NCCL_IB_DISABLE=1
 export PYTHONPATH="./:${PYTHONPATH:-}"
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-"1,2,3"}
+export PYTORCH_CUDA_ALLOC_CONF=${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}
 
-model_path="/path/to/Qwen3-VL-4B-Instruct"
-processor_path=""
+model_path="/path/to/Qwen2.5-VL-7B-Instruct"
+processor_path="TencentARC/TimeLens-7B"
 datasets="gemini_refined_data"
-model_id="qwen3-vl-4b"
+model_id="qwen2.5-vl-7b"
 min_tokens=64
 total_tokens=14336
-#total_tokens=11264
 fps=2
 fps_max_frames=""
 seed=42
 
 global_batch_size=128
 batch_per_device=1
-num_devices=3
+num_devices=8
 epochs=1
 target_size=30000
 deepspeed_config="scripts/zero3_offload.json"
-output_root="output/TimeLens-Qwen3-4B/sft"
+output_root="output/TimeLens-Qwen2.5-7B/sft"
 report_to="none"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --model_path) model_path="$2"; shift 2 ;;
     --processor_path) processor_path="$2"; shift 2 ;;
-    --model_id) model_id="$2"; shift 2 ;;
     --datasets) datasets="$2"; shift 2 ;;
     --min_tokens) min_tokens="$2"; shift 2 ;;
     --total_tokens) total_tokens="$2"; shift 2 ;;
@@ -60,7 +54,7 @@ if [[ -z "${fps_max_frames}" ]]; then
   fps_max_frames=$((total_tokens / min_tokens * 2))
 fi
 run_tag="$(date +%Y%m%d-%H%M)"
-run_name="sft-${run_tag}_MAXFRAMES-${fps_max_frames}_FPS-${fps}_TOTALtokens-${total_tokens}"
+run_name="sft-${run_tag}_MAXFRAMES-${fps_max_frames}_FPS-${fps}_TOTALtokens-${total_tokens}_MINtokens-${min_tokens}"
 output_dir="${output_root}/${run_name}"
 
 mkdir -p "${output_dir}"
@@ -95,9 +89,9 @@ deepspeed training/train/train_sft_timelens.py \
   --max_video_len 500 \
   --max_num_words 200 \
   --freeze_vision_tower True \
-  --freeze_llm False \
+  --freeze_llm True \
   --freeze_merger False \
-  --lora_enable False \
+  --lora_enable True \
   --learning_rate 1e-5 \
   --merger_lr 1e-5 \
   --weight_decay 0.1 \

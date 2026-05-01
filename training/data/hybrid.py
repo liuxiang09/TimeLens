@@ -15,7 +15,7 @@ def _build_default_filter_args(target_size: int):
 
 
 class HybridDataset(Dataset):
-    """Minimal hybrid dataset wrapper for TimeLens-8B training."""
+    """Minimal hybrid dataset wrapper for TimeLens training."""
 
     def __init__(
         self,

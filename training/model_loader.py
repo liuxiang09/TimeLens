@@ -1,14 +1,12 @@
-"""Model/config/processor loader for TimeLens-8B (Qwen3 only)."""
+"""Model/config/processor loader for Qwen-VL TimeLens training."""
 
 from transformers import AutoConfig, AutoModelForImageTextToText, AutoProcessor
 
+from training.model_family import infer_model_family
+
 
 def _validate_model_path(model_path: str) -> None:
-    model_path_lower = model_path.lower()
-    if "qwen3" not in model_path_lower and "timelens-8b" not in model_path_lower:
-        raise ValueError(
-            f"Only Qwen3-VL/TimeLens-8B is supported, got model_path={model_path!r}."
-        )
+    infer_model_family(model_path)
 
 
 def get_model_class(model_path: str):
@@ -22,5 +20,4 @@ def get_config_class(model_path: str):
 
 
 def get_processor_class(model_path: str):
-    _validate_model_path(model_path)
     return AutoProcessor

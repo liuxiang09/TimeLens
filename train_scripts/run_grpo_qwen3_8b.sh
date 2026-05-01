@@ -6,6 +6,7 @@ export PYTHONPATH="./:${PYTHONPATH:-}"
 export CUDA_LAUNCH_BLOCKING=1
 
 model_path=""
+processor_path=""
 raw_anno_path=""
 datasets="filtered_hybrid"
 model_id="qwen3-vl-8b"
@@ -21,13 +22,15 @@ num_devices=8
 epochs=1
 target_size=2500
 deepspeed_config="scripts/zero1.json"
-output_root="output/TimeLens-8B/grpo"
+output_root="output/TimeLens-Qwen3-8B/grpo"
 report_to="none"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --model_path) model_path="$2"; shift 2 ;;
+    --processor_path) processor_path="$2"; shift 2 ;;
     --raw_anno_path) raw_anno_path="$2"; shift 2 ;;
+    --model_id) model_id="$2"; shift 2 ;;
     --datasets) datasets="$2"; shift 2 ;;
     --min_tokens) min_tokens="$2"; shift 2 ;;
     --total_tokens) total_tokens="$2"; shift 2 ;;
@@ -70,6 +73,11 @@ output_dir="${output_root}/${run_name}"
 mkdir -p "${output_dir}"
 echo "Output directory: ${output_dir}"
 
+processor_args=()
+if [[ -n "${processor_path}" ]]; then
+  processor_args=(--processor_path "${processor_path}")
+fi
+
 deepspeed training/train/train_grpo_timelens.py \
   --bf16 True \
   --fp16 False \
@@ -78,6 +86,7 @@ deepspeed training/train/train_grpo_timelens.py \
   --gradient_checkpointing True \
   --deepspeed "${deepspeed_config}" \
   --model_name_or_path "${model_path}" \
+  "${processor_args[@]}" \
   --model_id "${model_id}" \
   --datasets "${datasets}" \
   --raw_anno_path "${raw_anno_path}" \

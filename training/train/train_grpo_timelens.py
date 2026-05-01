@@ -1,5 +1,5 @@
 """
-GRPO training script for TimeLens-8B.
+GRPO training script for TimeLens Qwen-VL models.
 Adapted from Qwen2-VL-Finetune/VideoMind train_grpo_videomind.py.
 """
 import ast
@@ -26,6 +26,7 @@ from training.train.train_utils import (
 )
 from training.train.reward_funcs import load_reward_funcs
 from training.model_loader import get_model_class, get_processor_class, get_config_class
+from training.model_family import resolve_processor_source
 
 local_rank = None
 
@@ -60,14 +61,18 @@ def set_requires_grad(parameters, requires_grad):
 
 
 def configure_vision_tower(model, training_args, compute_dtype, device):
-    vision_tower = model.visual
+    vision_tower = getattr(model, "visual", None)
+    if vision_tower is None:
+        return
     vision_tower.to(dtype=compute_dtype, device=device)
 
     vision_model_params = model.visual.parameters()
     set_requires_grad(vision_model_params, not training_args.freeze_vision_tower)
 
-    merger_params = model.visual.merger.parameters()
-    set_requires_grad(merger_params, not training_args.freeze_merger)
+    merger = getattr(model.visual, "merger", None)
+    if merger is not None:
+        merger_params = merger.parameters()
+        set_requires_grad(merger_params, not training_args.freeze_merger)
 
 
 def configure_llm(model, training_args):
@@ -128,7 +133,11 @@ def train():
         )
 
     model_cls = get_model_class(model_args.model_name_or_path)
-    processor_cls = get_processor_class(model_args.model_name_or_path)
+    processor_source = resolve_processor_source(
+        model_args.model_name_or_path, model_args.processor_path
+    )
+    model_args.processor_path = processor_source
+    processor_cls = get_processor_class(processor_source)
     config_cls = get_config_class(model_args.model_name_or_path)
 
     config = config_cls.from_pretrained(
@@ -198,7 +207,7 @@ def train():
     # `do_resize=False` at the processor call sites instead of persisting it
     # into the saved processor defaults.
     processor = processor_cls.from_pretrained(
-        model_args.model_name_or_path,
+        processor_source,
         padding_side="left",
         trust_remote_code=True,
     )

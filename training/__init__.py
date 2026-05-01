@@ -1,1 +1,1 @@
-# TimeLens-8B training package.
+# TimeLens training package.

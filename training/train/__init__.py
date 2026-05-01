@@ -1,1 +1,1 @@
-# Training scripts for TimeLens-8B
+# Training scripts for TimeLens

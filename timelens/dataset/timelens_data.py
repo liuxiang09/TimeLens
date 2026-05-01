@@ -11,8 +11,8 @@ def parse_query(query):
 
 
 class ActivitynetTimeLensDataset:
-    ANNO_PATH_TEST = "/home/zhangx/data/TimeLens-Bench/activitynet-timelens.json"
-    VIDEO_ROOT = "/home/zhangx/data/TimeLens-Bench/videos/activitynet"
+    ANNO_PATH_TEST = "/mnt/2753047e-bb0d-4a84-9488-1fce437519b3/TimeLens-Bench/activitynet-timelens.json"
+    VIDEO_ROOT = "/mnt/2753047e-bb0d-4a84-9488-1fce437519b3/TimeLens-Bench/videos/activitynet"
     DATASET_SOURCE = "ActivityNet-TimeLens"
 
     @classmethod

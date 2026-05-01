@@ -13,12 +13,18 @@ from transformers import AutoModelForImageTextToText, AutoProcessor
 from evaluation.utils import GroundingDataset
 from timelens.dataset.timelens_data import DATASET_DICT
 from timelens.utils import extract_time
+from training.model_family import resolve_processor_source
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--pred_path", required=True, help="Output prediction path")
     parser.add_argument("--model_path", required=True, help="Path to the model")
+    parser.add_argument(
+        "--processor_path",
+        default=None,
+        help="Optional processor checkpoint path. If omitted, use model_path.",
+    )
     parser.add_argument("--min_tokens", type=int, default=16)
     parser.add_argument("--total_tokens", type=int, default=3584)
     parser.add_argument("--fps", type=int, default=2)
@@ -68,9 +74,13 @@ if __name__ == "__main__":
         device_map=args.device,
     ).eval()
 
-    # Load processor (model-specific)
+    # Load processor. Some TimeLens checkpoints intentionally reuse a separate
+    # processor/config, e.g. Qwen2.5-VL timestamp encoding.
+    processor_source = resolve_processor_source(args.model_path, args.processor_path)
+    args.processor_path = processor_source
+    args.format_model_path = processor_source
     processor = AutoProcessor.from_pretrained(
-        args.model_path,
+        processor_source,
         padding_side="left",
         do_resize=False,  # For Video Processing, we do not need to resize the video frames again in the processor
         trust_remote_code=True,
@@ -90,7 +100,7 @@ if __name__ == "__main__":
         dataset,
         batch_size=1,
         shuffle=False,
-        num_workers=10,
+        num_workers=4,
         prefetch_factor=2,
         pin_memory=True,
         collate_fn=lambda x: x[0],

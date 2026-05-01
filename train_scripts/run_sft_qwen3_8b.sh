@@ -9,7 +9,8 @@ export PYTHONPATH="./:${PYTHONPATH:-}"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-"1,2,3"}
 
-model_path="/home/zhangx/Qwen/Qwen3-VL-8B-Instruct"
+model_path="/path/to/Qwen3-VL-8B-Instruct"
+processor_path=""
 datasets="gemini_refined_data"
 model_id="qwen3-vl-8b"
 min_tokens=64
@@ -25,12 +26,14 @@ num_devices=3
 epochs=1
 target_size=30000
 deepspeed_config="scripts/zero3_offload.json"
-output_root="ckpts/sft"
+output_root="output/TimeLens-Qwen3-8B/sft"
 report_to="none"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --model_path) model_path="$2"; shift 2 ;;
+    --processor_path) processor_path="$2"; shift 2 ;;
+    --model_id) model_id="$2"; shift 2 ;;
     --datasets) datasets="$2"; shift 2 ;;
     --min_tokens) min_tokens="$2"; shift 2 ;;
     --total_tokens) total_tokens="$2"; shift 2 ;;
@@ -63,6 +66,11 @@ output_dir="${output_root}/${run_name}"
 mkdir -p "${output_dir}"
 echo "Output directory: ${output_dir}"
 
+processor_args=()
+if [[ -n "${processor_path}" ]]; then
+  processor_args=(--processor_path "${processor_path}")
+fi
+
 deepspeed training/train/train_sft_timelens.py \
   --bf16 True \
   --fp16 False \
@@ -72,6 +80,7 @@ deepspeed training/train/train_sft_timelens.py \
   --use_liger True \
   --deepspeed "${deepspeed_config}" \
   --model_name_or_path "${model_path}" \
+  "${processor_args[@]}" \
   --model_id "${model_id}" \
   --conv_type "chatml" \
   --datasets "${datasets}" \

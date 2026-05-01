@@ -200,6 +200,7 @@ Our codebase supports evaluation of the following models:
 
 The evaluation script is [`scripts/eval_timelens_bench.sh`](./scripts/eval_timelens_bench.sh). You can set the following environment variables:
 - **`model_path`**: Path or HuggingFace ID of the model to evaluate. Default: `TencentARC/TimeLens-8B`
+- **`processor_path`**: Optional processor path. If omitted, the script uses `model_path`. For Qwen2.5-VL based TimeLens checkpoints that use textual timestamp encoding, set this to `TencentARC/TimeLens-7B`.
 - **`datasets`**: Comma-separated list of datasets to evaluate. Default: `charades-timelens,activitynet-timelens,qvhighlights-timelens`
 - **`CUDA_VISIBLE_DEVICES`**: GPU indices to use (e.g., `0,1,2,3`). Default: Auto-detect all available GPUs
 - **`pred_path`**: Directory to save results. Default: `./logs`
@@ -220,7 +221,14 @@ model_path="TencentARC/TimeLens-7B" \
 bash scripts/eval_timelens_bench.sh
 ```
 
-**Example 3**: Evaluate Qwen3-VL with a local model path and a custom path to save results:
+**Example 3**: Evaluate a local Qwen2.5-VL TimeLens checkpoint with the timestamp processor:
+```bash
+model_path="output/TimeLens-Qwen2.5-7B/sft/<your_sft_run_dir>" \
+processor_path="TencentARC/TimeLens-7B" \
+bash scripts/eval_timelens_bench.sh
+```
+
+**Example 4**: Evaluate Qwen3-VL with a local model path and a custom path to save results:
 ```bash
 pred_path="./path/to/results" \
 model_path="path/to/Qwen3-VL-8B-Instruct" \
@@ -322,7 +330,9 @@ We provide an example script [timelens_data.py](./timelens/dataset/timelens_data
 
 ### Use Our Training Code
 
-TimeLens-8B training is released as a 3-stage pipeline (SFT -> filter data -> GRPO):
+#### Qwen3-VL Training
+
+Qwen3-VL training uses the same 3-stage pipeline (SFT -> filter data -> GRPO) for 4B and 8B models. The public prebuilt artifacts below are for the 8B run, while the Python training/filtering code is model-size agnostic within the Qwen3-VL family.
 
 1. **SFT on TimeLens-100K (30K sampled)**
    We provide a prebuilt SFT checkpoint:
@@ -332,7 +342,7 @@ TimeLens-8B training is released as a 3-stage pipeline (SFT -> filter data -> GR
 ```bash
 hf download JungleGym/TimeLens-Qwen3-VL-8B-SFT \
   --repo-type model \
-  --local-dir output/TimeLens-8B/sft/prebuilt
+  --local-dir output/TimeLens-Qwen3-8B/sft/prebuilt
 ```
 
    You can also reproduce SFT by yourself:
@@ -340,6 +350,9 @@ hf download JungleGym/TimeLens-Qwen3-VL-8B-SFT \
 ```bash
 bash train_scripts/run_sft_qwen3_8b.sh \
   --model_path "/path/to/Qwen3-VL-8B-Instruct"
+
+bash train_scripts/run_sft_qwen3_4b.sh \
+  --model_path "/path/to/Qwen3-VL-4B-Instruct"
 ```
 
 2. **Run filtering inference on full TimeLens-100K and compute IoU**
@@ -351,56 +364,102 @@ bash train_scripts/run_sft_qwen3_8b.sh \
 hf download JungleGym/TimeLens-Qwen3-VL-8B-filter-data \
   FPS-2-maxframes-448_TOTALtokens-14336_MINtokens-64---20251209_223300/gemini_refined_data.jsonl \
   --repo-type dataset \
-  --local-dir output/TimeLens-8B/filter-data/prebuilt
+  --local-dir output/TimeLens-Qwen3-8B/filter-data/prebuilt
 ```
 
    You can also generate it by yourself:
 
 ```bash
-bash scripts/filter_data/filter_data_qwen3_vl.sh \
-  --model_path "output/TimeLens-8B/sft/<your_sft_run_dir>" \
+bash scripts/filter_data/filter_data_qwen3_8b.sh \
+  --model_path "output/TimeLens-Qwen3-8B/sft/<your_sft_run_dir>" \
   --dataset gemini_refined_data
 ```
 
-This stage writes inference output to:
-`output/TimeLens-8B/filter-data/.../gemini_refined_data.jsonl`
+For a 4B run, use the dedicated script:
+
+```bash
+bash scripts/filter_data/filter_data_qwen3_4b.sh \
+  --model_path "output/TimeLens-Qwen3-4B/sft/<your_sft_run_dir>" \
+  --dataset gemini_refined_data
+```
+
+In the 8B example, this stage writes inference output to:
+`output/TimeLens-Qwen3-8B/filter-data/.../gemini_refined_data.jsonl`
 
 3. **GRPO training from SFT checkpoint (filtering jsonl as input)**
    If you use prebuilt files downloaded above, use:
-   `--model_path output/TimeLens-8B/sft/prebuilt` and
-   `--raw_anno_path output/TimeLens-8B/filter-data/prebuilt/FPS-2-maxframes-448_TOTALtokens-14336_MINtokens-64---20251209_223300/gemini_refined_data.jsonl`
+   `--model_path output/TimeLens-Qwen3-8B/sft/prebuilt` and
+   `--raw_anno_path output/TimeLens-Qwen3-8B/filter-data/prebuilt/FPS-2-maxframes-448_TOTALtokens-14336_MINtokens-64---20251209_223300/gemini_refined_data.jsonl`
 
-   Training + evaluation:
-
-```bash
-bash train_scripts/run_grpo_and_eval_qwen3_8b.sh \
-  --model_path "output/TimeLens-8B/sft/<your_sft_run_dir>" \
-  --raw_anno_path "output/TimeLens-8B/filter-data/<your_filter_run_dir>/gemini_refined_data.jsonl"
-```
-
-Training only:
+   Training:
 
 ```bash
 bash train_scripts/run_grpo_qwen3_8b.sh \
-  --model_path "output/TimeLens-8B/sft/<your_sft_run_dir>" \
-  --raw_anno_path "output/TimeLens-8B/filter-data/<your_filter_run_dir>/gemini_refined_data.jsonl"
+  --model_path "output/TimeLens-Qwen3-8B/sft/<your_sft_run_dir>" \
+  --raw_anno_path "output/TimeLens-Qwen3-8B/filter-data/<your_filter_run_dir>/gemini_refined_data.jsonl"
 ```
 
-Final GRPO checkpoints are saved under:
-`output/TimeLens-8B/grpo/...`
+For a 4B run:
+
+```bash
+bash train_scripts/run_grpo_qwen3_4b.sh \
+  --model_path "output/TimeLens-Qwen3-4B/sft/<your_sft_run_dir>" \
+  --raw_anno_path "output/TimeLens-Qwen3-4B/filter-data/<your_filter_run_dir>/gemini_refined_data.jsonl"
+```
+
+Final GRPO checkpoints are saved under the configured output root, for example:
+`output/TimeLens-Qwen3-8B/grpo/...`
 
 #### Evaluate Trained Checkpoints
 
 Use the existing TimeLens-Bench evaluation code directly:
 
 ```bash
-model_path="output/TimeLens-8B/grpo/<your_grpo_run_dir>" \
+model_path="output/TimeLens-Qwen3-8B/grpo/<your_grpo_run_dir>" \
 bash scripts/eval_timelens_bench.sh
 ```
 
-#### TimeLens-7B training (based on Qwen2.5-VL)
+#### Qwen2.5-VL training
 
-Please use the [**train**](https://github.com/TencentARC/TimeLens/tree/train) branch for **TimeLens-7B (Qwen2.5-VL)** training. The full training scripts and usage instructions are maintained there.
+This codebase also supports the Qwen2.5-VL training flow. All Qwen2.5-VL based TimeLens models use the textual timestamp data path, including 7B and 3B variants. Pass `processor_path="TencentARC/TimeLens-7B"` explicitly when you want the paper's Qwen2.5 timestamp processor/config; if omitted, the code uses the model's own processor.
+
+1. **SFT**:
+
+```bash
+bash train_scripts/run_sft_qwen25_7b.sh \
+  --model_path "/path/to/Qwen2.5-VL-7B-Instruct" \
+  --processor_path "TencentARC/TimeLens-7B"
+
+bash train_scripts/run_sft_qwen25_3b.sh \
+  --model_path "/path/to/Qwen2.5-VL-3B-Instruct" \
+  --processor_path "TencentARC/TimeLens-7B"
+```
+
+2. **Filter data**:
+
+```bash
+bash scripts/filter_data/filter_data_qwen25_7b.sh \
+  --model_path "output/TimeLens-Qwen2.5-7B/sft/<your_sft_run_dir>" \
+  --processor_path "TencentARC/TimeLens-7B"
+
+bash scripts/filter_data/filter_data_qwen25_3b.sh \
+  --model_path "output/TimeLens-Qwen2.5-3B/sft/<your_sft_run_dir>" \
+  --processor_path "TencentARC/TimeLens-7B"
+```
+
+3. **GRPO training from the SFT checkpoint**:
+
+```bash
+bash train_scripts/run_grpo_qwen25_7b.sh \
+  --model_path "output/TimeLens-Qwen2.5-7B/sft/<your_sft_run_dir>" \
+  --processor_path "TencentARC/TimeLens-7B" \
+  --raw_anno_path "output/TimeLens-Qwen2.5-7B/filter-data/<your_filter_run_dir>/gemini_refined_data.jsonl"
+
+bash train_scripts/run_grpo_qwen25_3b.sh \
+  --model_path "output/TimeLens-Qwen2.5-3B/sft/<your_sft_run_dir>" \
+  --processor_path "TencentARC/TimeLens-7B" \
+  --raw_anno_path "output/TimeLens-Qwen2.5-3B/filter-data/<your_filter_run_dir>/gemini_refined_data.jsonl"
+```
 
 ## 📝 Citation
 If you find our paper, code, model, and data helpful for your research and applications, please consider giving a star ⭐ and citation 📝 :)

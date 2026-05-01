@@ -8,7 +8,6 @@ import nncore
 import torch
 from nncore.engine import set_random_seed
 from torch.utils.data import DataLoader
-from transformers import AutoModelForImageTextToText, AutoProcessor
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 if str(WORKSPACE_ROOT) not in sys.path:
@@ -16,6 +15,8 @@ if str(WORKSPACE_ROOT) not in sys.path:
 
 from timelens.dataset.timelens_data import TimeLens100KDataset
 from training.data import GroundingDatasetInference, collate_fn
+from training.model_loader import get_model_class, get_processor_class
+from training.model_family import resolve_processor_source
 from training.utils.parser import extract_answer, extract_time, iou
 
 AUDIO_QUERY_KEYWORDS = {
@@ -41,6 +42,11 @@ def parse_args():
     parser.add_argument("--dataset", default="gemini_refined_data")
     parser.add_argument("--pred_path", required=True)
     parser.add_argument("--model_path", required=True)
+    parser.add_argument(
+        "--processor_path",
+        default=None,
+        help="Optional processor checkpoint path. If omitted, use model_path.",
+    )
     parser.add_argument("--split", default="train")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--chunk", type=int, default=1)
@@ -95,14 +101,20 @@ if __name__ == "__main__":
     if args.device != "auto":
         raise ValueError('Only device="auto" is supported.')
 
-    model = AutoModelForImageTextToText.from_pretrained(
+    model_cls = get_model_class(args.model_path)
+    processor_source = resolve_processor_source(args.model_path, args.processor_path)
+    processor_cls = get_processor_class(processor_source)
+    args.processor_path = processor_source
+    args.format_model_path = processor_source
+
+    model = model_cls.from_pretrained(
         args.model_path,
-        dtype=torch.bfloat16,
+        torch_dtype=torch.bfloat16,
         attn_implementation="flash_attention_2",
         device_map=args.device,
     ).eval()
-    processor = AutoProcessor.from_pretrained(
-        args.model_path,
+    processor = processor_cls.from_pretrained(
+        processor_source,
         padding_side="left",
         do_resize=False,
         trust_remote_code=True,
@@ -120,7 +132,11 @@ if __name__ == "__main__":
         num_workers=10,
         prefetch_factor=2,
         pin_memory=True,
-        collate_fn=partial(collate_fn, processor=processor, model_name=args.model_path),
+        collate_fn=partial(
+            collate_fn,
+            processor=processor,
+            model_name=(args.format_model_path, args.model_path),
+        ),
     )
 
     dumps = []

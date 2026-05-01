@@ -9,11 +9,17 @@ from torch.utils.data import Dataset
 
 from timelens.dataset.timelens_data import TimeLens100KDataset, parse_query
 from training.data.preprocess import preprocess
+from training.model_family import uses_textual_timestamps, video_pixel_scale
 
 GROUNDING_PROMPT = (
     "Please find the visual event described by the sentence '{}', determining its starting and ending times. "
     "The format should be: 'The event happens in <start time> - <end time> seconds'."
 )
+
+GROUNDING_PROMPT_TEXT_TIMESTAMP = (
+    "You are given a video with multiple frames. "
+    "The numbers before each video frame indicate its sampling timestamp (in seconds). "
+) + GROUNDING_PROMPT
 
 AUDIO_QUERY_KEYWORDS = {
     "hear",
@@ -51,12 +57,56 @@ def _format_response(spans):
     )
 
 
-def _build_video_content(anno, data_args, include_video_range=False):
+def _extract_sampled_timestamps(videos):
+    if videos is None or len(videos) == 0:
+        raise ValueError("Expected non-empty videos for Qwen2.5-VL timestamp path.")
+    if not isinstance(videos[0], (list, tuple)) or len(videos[0]) != 2:
+        raise ValueError(
+            "Qwen2.5-VL timestamp path expects videos to contain "
+            "(video_tensor, metadata) tuples."
+        )
+
+    metadata = videos[0][1]
+    fps = float(metadata["fps"])
+    frame_indices = metadata["frames_indices"]
+    if hasattr(frame_indices, "tolist"):
+        frame_indices = frame_indices.tolist()
+    return [float(idx) / fps for idx in frame_indices[::2]]
+
+
+def _align_spans_to_sampled_timestamps(spans, sampled_timestamps):
+    aligned_spans = []
+    for start, end in spans:
+        start_idx = 0
+        for i, cur_ts in enumerate(sampled_timestamps):
+            if cur_ts <= start:
+                start_idx = i
+            else:
+                break
+
+        end_idx = len(sampled_timestamps) - 1
+        for i in range(start_idx, len(sampled_timestamps)):
+            if end <= sampled_timestamps[i]:
+                end_idx = i
+                break
+
+        aligned_spans.append([sampled_timestamps[start_idx], sampled_timestamps[end_idx]])
+    return aligned_spans
+
+
+def _as_model_refs(model_ref):
+    if isinstance(model_ref, (list, tuple)):
+        return tuple(model_ref)
+    return (model_ref,)
+
+
+def _build_video_content(anno, data_args, include_video_range=False, model_ref=None):
+    scale = video_pixel_scale(*_as_model_refs(model_ref))
     content = {
         "type": "video",
         "video": anno["video_path"],
-        "min_pixels": int(data_args.min_tokens * 32 * 32),
-        "total_pixels": int(data_args.total_tokens * 32 * 32),
+        "min_pixels": int(data_args.min_tokens * scale),
+        "total_pixels": int(data_args.total_tokens * scale),
         "fps": float(data_args.fps),
     }
     if include_video_range:
@@ -110,6 +160,18 @@ class GroundingDataset(Dataset):
         self.data_args = data_args
         self.training_args = training_args
         self.training_mode = training_mode
+        self._model_ref = (
+            model_args.processor_path
+            or model_args.model_name_or_path
+            or model_args.model_id
+            or ""
+        )
+        self._model_refs = (
+            model_args.processor_path,
+            model_args.model_name_or_path,
+            model_args.model_id,
+        )
+        self._uses_textual_timestamps = uses_textual_timestamps(*self._model_refs)
 
         if dataset_name in ("gemini_refined_data", "timelens-100k"):
             base_annos = TimeLens100KDataset.load_annos(split="train")
@@ -261,43 +323,77 @@ class GroundingDataset(Dataset):
     def _getitem_sft(self, idx):
         anno = copy.deepcopy(self.annos[idx])
         spans = _normalize_spans(anno["span"])
+        prompt = (
+            GROUNDING_PROMPT_TEXT_TIMESTAMP
+            if self._uses_textual_timestamps
+            else GROUNDING_PROMPT
+        )
 
         messages = [
             {
                 "role": "user",
                 "content": [
-                    _build_video_content(anno, self.data_args),
-                    {"type": "text", "text": GROUNDING_PROMPT.format(anno["query"])},
+                    _build_video_content(
+                        anno, self.data_args, model_ref=self._model_refs
+                    ),
+                    {"type": "text", "text": prompt.format(anno["query"])},
                 ],
             }
         ]
 
-        images, videos, video_kwargs = process_vision_info(
-            messages,
-            image_patch_size=16,
-            return_video_kwargs=True,
-            return_video_metadata=True,
-        )
-        if videos is not None:
-            videos, video_metadatas = zip(*videos)
-            videos, video_metadatas = list(videos), list(video_metadatas)
-        else:
+        if self._uses_textual_timestamps:
+            images, videos = process_vision_info(
+                messages,
+                return_video_metadata=True,
+            )
+            if videos is None or len(videos) == 0:
+                raise ValueError(
+                    "Empty videos for Qwen2.5-VL timestamp path. "
+                    "Please ensure the timestamp processor/config and qwen_vl_utils are aligned."
+                )
+            video_kwargs = {}
             video_metadatas = None
+            spans = _align_spans_to_sampled_timestamps(
+                spans,
+                _extract_sampled_timestamps(videos),
+            )
+        else:
+            images, videos, video_kwargs = process_vision_info(
+                messages,
+                image_patch_size=16,
+                return_video_kwargs=True,
+                return_video_metadata=True,
+            )
+            if videos is not None:
+                videos, video_metadatas = zip(*videos)
+                videos, video_metadatas = list(videos), list(video_metadatas)
+            else:
+                video_metadatas = None
 
         response = _format_response(spans)
         messages.append({"role": "assistant", "content": response})
 
         text = self.processor.apply_chat_template(messages, tokenize=False)
         text = [text.strip()]
-        inputs = self.processor(
-            text=text,
-            images=images,
-            videos=videos,
-            video_metadata=video_metadatas,
-            return_tensors="pt",
-            do_resize=False,
-            **video_kwargs,
-        )
+        if self._uses_textual_timestamps:
+            inputs = self.processor(
+                text=text,
+                images=images,
+                videos=videos,
+                return_tensors="pt",
+                do_resize=False,
+                **video_kwargs,
+            )
+        else:
+            inputs = self.processor(
+                text=text,
+                images=images,
+                videos=videos,
+                video_metadata=video_metadatas,
+                return_tensors="pt",
+                do_resize=False,
+                **video_kwargs,
+            )
         inputs["input_ids"] = inputs["input_ids"][0]
         inputs["labels"] = preprocess(
             inputs["input_ids"],
@@ -309,15 +405,23 @@ class GroundingDataset(Dataset):
 
     def _getitem_grpo(self, idx):
         anno = copy.deepcopy(self.annos[idx])
+        prompt = (
+            GROUNDING_PROMPT_TEXT_TIMESTAMP
+            if self._uses_textual_timestamps
+            else GROUNDING_PROMPT
+        )
 
         messages = [
             {
                 "role": "user",
                 "content": [
                     _build_video_content(
-                        anno, self.data_args, include_video_range=True
+                        anno,
+                        self.data_args,
+                        include_video_range=True,
+                        model_ref=self._model_refs,
                     ),
-                    {"type": "text", "text": GROUNDING_PROMPT.format(anno["query"])},
+                    {"type": "text", "text": prompt.format(anno["query"])},
                 ],
             }
         ]
@@ -329,27 +433,54 @@ class GroundingDataset(Dataset):
         )
         text = [text]
 
-        images, videos, video_kwargs = process_vision_info(
-            messages,
-            image_patch_size=16,
-            return_video_kwargs=True,
-            return_video_metadata=True,
-        )
-        if videos is not None:
-            videos, video_metadatas = zip(*videos)
-            videos, video_metadatas = list(videos), list(video_metadatas)
-        else:
+        if self._uses_textual_timestamps:
+            images, videos = process_vision_info(
+                messages,
+                return_video_metadata=True,
+            )
+            if videos is None or len(videos) == 0:
+                raise ValueError(
+                    "Empty videos for Qwen2.5-VL timestamp path. "
+                    "Please ensure the timestamp processor/config and qwen_vl_utils are aligned."
+                )
+            video_kwargs = {}
             video_metadatas = None
+            anno["span"] = _align_spans_to_sampled_timestamps(
+                _normalize_spans(anno["span"]),
+                _extract_sampled_timestamps(videos),
+            )
+        else:
+            images, videos, video_kwargs = process_vision_info(
+                messages,
+                image_patch_size=16,
+                return_video_kwargs=True,
+                return_video_metadata=True,
+            )
+            if videos is not None:
+                videos, video_metadatas = zip(*videos)
+                videos, video_metadatas = list(videos), list(video_metadatas)
+            else:
+                video_metadatas = None
 
-        inputs = self.processor(
-            text=text,
-            images=images,
-            videos=videos,
-            video_metadata=video_metadatas,
-            return_tensors="pt",
-            do_resize=False,
-            **video_kwargs,
-        )
+        if self._uses_textual_timestamps:
+            inputs = self.processor(
+                text=text,
+                images=images,
+                videos=videos,
+                return_tensors="pt",
+                do_resize=False,
+                **video_kwargs,
+            )
+        else:
+            inputs = self.processor(
+                text=text,
+                images=images,
+                videos=videos,
+                video_metadata=video_metadatas,
+                return_tensors="pt",
+                do_resize=False,
+                **video_kwargs,
+            )
         inputs["input_ids"] = inputs["input_ids"][0]
         inputs["prompt"] = messages
         inputs["prompt_text"] = text[0]

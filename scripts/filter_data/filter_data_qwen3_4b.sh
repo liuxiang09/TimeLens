@@ -11,20 +11,20 @@ trap cleanup SIGINT SIGTERM
 export PYTHONPATH="./:${PYTHONPATH:-}"
 
 dataset="gemini_refined_data"
-model_path="/path/to/Qwen3-VL-8B-Instruct"
-model_id="qwen3-vl-8b"
+model_path="/path/to/Qwen3-VL-4B-Instruct"
+processor_path=""
 min_tokens=64
 total_tokens=14336
 fps=2
 fps_max_frames=""
-pred_root="output/TimeLens-8B/filter-data"
+pred_root="output/TimeLens-Qwen3-4B/filter-data"
 seed=42
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dataset) dataset="$2"; shift 2 ;;
     --model_path) model_path="$2"; shift 2 ;;
-    --model_id) model_id="$2"; shift 2 ;;
+    --processor_path) processor_path="$2"; shift 2 ;;
     --min_tokens) min_tokens="$2"; shift 2 ;;
     --total_tokens) total_tokens="$2"; shift 2 ;;
     --fps) fps="$2"; shift 2 ;;
@@ -50,12 +50,18 @@ CHUNKS=${#GPULIST[@]}
 echo "Using GPUs: ${GPULIST[*]}"
 echo "Output path: ${pred_path}"
 
+processor_args=()
+if [[ -n "${processor_path}" ]]; then
+  processor_args=(--processor_path "${processor_path}")
+fi
+
 for IDX in $(seq 0 $((CHUNKS-1))); do
   CUDA_VISIBLE_DEVICES=${GPULIST[$IDX]} python training/filter/infer_qwen3_vl_tvg_dataloader_filter_data.py \
     --dataset "${dataset}" \
     --split train \
     --pred_path "${pred_path}" \
     --model_path "${model_path}" \
+    "${processor_args[@]}" \
     --chunk "${CHUNKS}" \
     --index "${IDX}" \
     --seed "${seed}" \

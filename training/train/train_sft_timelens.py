@@ -21,6 +21,7 @@ from training.train.train_utils import (
     safe_save_model_for_hf_trainer,
 )
 from training.model_loader import get_config_class, get_model_class, get_processor_class
+from training.model_family import resolve_processor_source
 
 local_rank = None
 
@@ -126,7 +127,11 @@ def train():
         )
 
     model_cls = get_model_class(model_args.model_name_or_path)
-    processor_cls = get_processor_class(model_args.model_name_or_path)
+    processor_source = resolve_processor_source(
+        model_args.model_name_or_path, model_args.processor_path
+    )
+    model_args.processor_path = processor_source
+    processor_cls = get_processor_class(processor_source)
     config_cls = get_config_class(model_args.model_name_or_path)
 
     config = config_cls.from_pretrained(
@@ -207,7 +212,7 @@ def train():
     # `do_resize=False` at the processor call sites instead of persisting it
     # into the saved processor defaults.
     processor = processor_cls.from_pretrained(
-        model_args.model_name_or_path, trust_remote_code=True
+        processor_source, trust_remote_code=True
     )
 
     if training_args.bits in [4, 8]:
