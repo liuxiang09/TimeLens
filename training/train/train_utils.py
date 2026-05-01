@@ -53,11 +53,11 @@ def print_trainable_parameters(model, training_args):
         if param.requires_grad:
             trainable_params_non_lora += param_count
 
-        if name.startswith('visual.merger'):
+        if name.startswith(("visual.merger", "model.visual.merger")):
             merger_total += param_count
             if param.requires_grad:
                 merger_trainable += param_count
-        elif name.startswith('visual.'):
+        elif name.startswith(("visual.", "model.visual.")):
             vision_encoder_total += param_count
             if param.requires_grad:
                 vision_encoder_trainable += param_count
