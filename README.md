@@ -71,29 +71,3 @@ model_id="qwen3-vl-8b" \
 model_path="output/temporal_grounding/qwen3/grpo/YOUR_GRPO_RUN_DIR" \
 bash scripts/temporal_grounding/eval.sh
 ```
-
-也可以直接调用 Python 入口：
-
-```bash
-python -m src.timelens.train.sft --help
-python -m src.timelens.train.grpo --help
-python -m src.timelens.data.filter_data --help
-python -m src.timelens.eval.eval_bench --help
-python -m src.timelens.eval.metrics --help
-```
-
-## 当前代码结构
-
-```text
-src/
-  models/       # Qwen2.5-VL / Qwen3-VL 模型适配、模型族识别和 processor 加载
-  timelens/     # TimeLens prompt、数据、过滤、reward、训练、推理和评测
-  training/     # 通用训练参数、LoRA、保存逻辑、SFT/GRPO Trainer
-  data/         # 通用 ChatML、collator、vision processor 输入辅助
-  utils/        # JSON、时间戳解析、temporal IoU 等工具
-
-scripts/
-  qwen25/       # Qwen2.5-VL SFT / GRPO 脚本
-  qwen3/        # Qwen3-VL SFT / GRPO 脚本
-  temporal_grounding/  # TimeLens 数据过滤和 Bench 评测脚本
-```
