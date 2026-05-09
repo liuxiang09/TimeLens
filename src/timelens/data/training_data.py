@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 
 from src.data.chatml import preprocess
 from src.data.vision import build_processor_inputs
-from src.timelens.filter.filtering import (
+from src.timelens.data.filtering import (
     build_default_filter_args,
     filter_annos,
     load_filtered_annos,

@@ -62,7 +62,7 @@ if [[ -n "${train_jsonl}" ]]; then optional_args+=(--train_jsonl "${train_jsonl}
 if [[ -n "${video_root}" ]]; then optional_args+=(--video_root "${video_root}"); fi
 
 for IDX in $(seq 0 $((CHUNKS-1))); do
-  CUDA_VISIBLE_DEVICES=${GPULIST[$IDX]} python -m src.timelens.filter.filter_data \
+  CUDA_VISIBLE_DEVICES=${GPULIST[$IDX]} python -m src.timelens.data.filter_data \
     --dataset "${dataset}" \
     --split train \
     --pred_path "${pred_path}" \

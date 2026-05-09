@@ -38,13 +38,16 @@ def tiou_reward(prompts, completions, completion_ids, anno, prompt_text, **kwarg
         if len(timestamps) == 0:
             print(f"Timestamp extraction failed: pred={pred}, IoU will be 0")
             rewards.append(0)
-        elif timestamps[0][0] >= timestamps[0][1]:
+            continue
+
+        pred_span = timestamps[-1]
+        if len(timestamps) > 1:
+            print(f"Warning: Multiple timestamps for '{pred}', using last: {pred_span}")
+        if pred_span[0] >= pred_span[1]:
             print(f"Warning: Invalid timestamp in prediction '{pred}', IoU will be 0")
             rewards.append(0)
         else:
-            if len(timestamps) > 1:
-                print(f"Warning: Multiple timestamps for '{pred}', using first: {timestamps[0]}")
-            rewards.append(iou(gt, timestamps[0]))
+            rewards.append(iou(gt, pred_span))
             print(
                 f"prompt: {prompt_text[i]}, completion: {completions[i]}, "
                 f"answer: {pred}, gt: {gt}, tIoU: {rewards[i]}"

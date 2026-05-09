@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
         if len(timestamps) > 1:
             print(
-                f"Warning: Multiple timestamp pairs found for prediction '{pred}', using the first pair: {timestamps[0]}"
+                f"Warning: Multiple timestamp pairs found for prediction '{pred}', using the last pair: {timestamps[-1]}"
             )
         elif len(timestamps) == 0:
             print(
@@ -64,7 +64,7 @@ if __name__ == "__main__":
             )
             timestamps = [(-100, -100)]
 
-        timestamps = timestamps[0]  # only use the first pair of timestamps
+        timestamps = timestamps[-1]  # only use the last pair of timestamps
         if timestamps[0] >= timestamps[1]:
             print(
                 f"Warning: Invalid timestamp found in prediction '{pred}', start timestamp >= end timestamp, IoU will be 0"

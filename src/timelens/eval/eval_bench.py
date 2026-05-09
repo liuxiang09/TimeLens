@@ -132,6 +132,8 @@ def main():
                 [round(start / unit) * unit, round(end / unit) * unit]
                 for start, end in timestamps
             ]
+            if len(timestamps) > 1:
+                timestamps = [timestamps[-1]]
             video_name = os.path.basename(video_path)
             if isinstance(span[0], (list, tuple)):
                 span = span[0]
