@@ -1,4 +1,4 @@
-"""TimeLens 推理数据集和批处理整理函数。"""
+"""TimeLens 推理数据集、批处理整理和视频字段构造。"""
 
 import copy
 
@@ -6,8 +6,24 @@ from torch.utils.data import Dataset
 
 from src.data.vision import build_processor_inputs
 from src.timelens.prompts import grounding_prompt, parse_query
-from src.timelens.data.video_content import build_video_content
 from src.models.registry import get_adapter
+
+
+def build_video_content(adapter, anno, data_args, include_video_range=False):
+    """根据标注和数据参数构造对话模板中的视频字段。"""
+    content = {
+        "type": "video",
+        "video": anno["video_path"],
+        "min_pixels": int(data_args.min_tokens * adapter.pixel_scale),
+        "total_pixels": int(data_args.total_tokens * adapter.pixel_scale),
+        "fps": float(data_args.fps),
+    }
+    if include_video_range:
+        content["video_start"] = anno.get("video_start")
+        content["video_end"] = anno.get("video_end")
+    if getattr(data_args, "fps_max_frames", None) is not None:
+        content["max_frames"] = int(data_args.fps_max_frames)
+    return content
 
 
 def collate_fn(batch, processor, adapter):

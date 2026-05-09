@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 
 from src.data.chatml import preprocess
 from src.data.vision import build_processor_inputs
-from src.timelens.data.filtering import (
+from src.timelens.filter.filtering import (
     build_default_filter_args,
     filter_annos,
     load_filtered_annos,
@@ -19,7 +19,7 @@ from src.timelens.prompts import (
     grounding_prompt,
     normalize_spans,
 )
-from src.timelens.data.video_content import build_video_content
+from src.timelens.data.inference_data import build_video_content
 from src.models.registry import get_adapter
 
 

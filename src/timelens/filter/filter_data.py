@@ -3,7 +3,7 @@
 import argparse
 from functools import partial
 
-from src.timelens.data.filtering import load_train_annos
+from src.timelens.filter.filtering import load_train_annos
 from src.models.loader import resolve_processor_source
 from src.models.registry import get_adapter
 from src.utils.json_io import dump_jsonl
@@ -41,7 +41,7 @@ def main():
     from nncore.engine import set_random_seed
     from torch.utils.data import DataLoader
 
-    from src.timelens.data.inference import GroundingDatasetInference, collate_fn
+    from src.timelens.data.inference_data import GroundingDatasetInference, collate_fn
 
     args.seed = set_random_seed(args.seed)
     print(f"Setting random seed to {args.seed}")

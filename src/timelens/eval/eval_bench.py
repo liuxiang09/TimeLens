@@ -4,12 +4,17 @@ import argparse
 import os
 from functools import partial
 
-from src.timelens.eval.dataloader import load_bench_annos
 from src.timelens.data.datasets import DATASET_DICT
 from src.models.loader import resolve_processor_source
 from src.models.registry import get_adapter
 from src.utils.json_io import dump_jsonl
 from src.utils.span import extract_time
+
+
+def load_bench_annos(dataset_name, split="test", bench_root=None):
+    """按数据集名称加载 TimeLens-Bench 标注。"""
+    dataset_class = DATASET_DICT[dataset_name]
+    return dataset_class.load_annos(split=split, bench_root=bench_root)
 
 
 def parse_args():
@@ -42,7 +47,7 @@ def main():
     from nncore.engine import set_random_seed
     from torch.utils.data import DataLoader
 
-    from src.timelens.data.inference import GroundingDatasetInference, collate_fn
+    from src.timelens.data.inference_data import GroundingDatasetInference, collate_fn
 
     args.seed = set_random_seed(args.seed)
     print(f"Setting random seed to {args.seed}")

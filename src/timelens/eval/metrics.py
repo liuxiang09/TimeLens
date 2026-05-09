@@ -1,6 +1,5 @@
 # Copyright (c) 2025 Jun Zhang. Licensed under the BSD-3-Clause License.
 # Modified from https://github.com/RenShuhuai-Andy/TimeChat/blob/master/utils/format_tvg.py
-# 中文说明：本文件保留 TimeChat 风格指标计算，只替换为 src 的时间段解析和 JSON 工具。
 import argparse
 from pathlib import Path
 
