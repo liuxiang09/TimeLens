@@ -21,6 +21,7 @@ total_tokens=${total_tokens:-14336}
 fps=${fps:-2}
 fps_max_frames=${fps_max_frames:-""}
 seed=${seed:-42}
+max_new_tokens=${max_new_tokens:-1024}
 
 IFS=',' read -ra GPULIST <<< "${CUDA_VISIBLE_DEVICES:-0}"
 CHUNKS=${#GPULIST[@]}
@@ -60,6 +61,7 @@ for dataset in "${DATASETS[@]}"; do
       --min_tokens "${min_tokens}" \
       --total_tokens "${total_tokens}" \
       --fps "${fps}" \
+      --max_new_tokens "${max_new_tokens}" \
       --seed "${seed}" &
   done
   wait
